@@ -1,3 +1,5 @@
 fire
 kagglehub
 kaggle
+pandas
+scikit-learn
