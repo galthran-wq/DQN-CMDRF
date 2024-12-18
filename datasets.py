@@ -37,8 +37,8 @@ class AustraliaDataset(Dataset):
 
 
 class GermanDataset(Dataset):
-    CATEGORICAL_COLUMNS = ["A1", "A3", "A4", "A6", "A7", "A9", "A10", "A12", "A14", "A17", ]
-    NUMERICAL_COLUMNS = ["A2", "A5", "A8", "A11", "A13", "A15", "A16", "A18", "A19", "A20"]
+    CATEGORICAL_COLUMNS = ["A1", "A3", "A4", "A6", "A7", "A9", "A10", "A12", "A14", "A15", "A17", "A19", "A20" ]
+    NUMERICAL_COLUMNS = ["A2", "A5", "A8", "A11", "A13", "A16", "A18"]
     TARGET_COLUMN = "A21"
 
     def load_data(self):
