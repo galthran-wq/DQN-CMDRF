@@ -3,3 +3,5 @@ kagglehub
 kaggle
 pandas
 scikit-learn
+catboost
+pyyaml
