@@ -275,9 +275,9 @@ def train_and_evaluate(config, log_dir):
 
 def main(config_path):
     config = load_config(config_path)
-    log_dir = save_logs(config, {}, config['dataset'], [], [])
+    log_dir = save_logs(config, {}, "dqn", config['dataset'], [], [])
     model, metrics, y_test, y_pred_proba = train_and_evaluate(config, log_dir)
-    save_logs(config, metrics, config['dataset'], y_test, y_pred_proba, log_dir)
+    save_logs(config, metrics, "dqn", config['dataset'], y_test, y_pred_proba, log_dir)
     print(f"Training complete. Logs saved in {os.path.join('logs', config['dataset'])}")
 
 if __name__ == "__main__":

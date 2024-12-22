@@ -38,10 +38,10 @@ def plot_and_save_curves(y_test, y_pred_proba, log_dir):
     plt.savefig(roc_curve_path)
     plt.close()
 
-def save_logs(config, metrics, dataset_name, y_test, y_pred_proba, log_dir=None):
+def save_logs(config, metrics, model_name, dataset_name, y_test, y_pred_proba, log_dir=None):
     if log_dir is None:
         # Create log directory
-        time_str = datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+        time_str = datetime.now().strftime(f"{model_name}_%Y.%m.%d_%H.%M.%S")
         log_dir = os.path.join("logs", dataset_name, time_str)
         os.makedirs(log_dir, exist_ok=True)
 
