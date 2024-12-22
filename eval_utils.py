@@ -53,7 +53,7 @@ def plot_and_save_curves(y_test, y_pred_proba, log_dir):
 def save_logs(config, metrics, dataset_name, y_test, y_pred_proba, log_dir=None, gs_params=None, history=None):
     if log_dir is None:
         # Create log directory
-        time_str = datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+        time_str = datetime.now().strftime(f"%Y.%m.%d_%H.%M.%S")
         log_dir = os.path.join("logs", dataset_name, time_str)
         if gs_params is not None:
             log_dir = os.path.join("gridsearch", dataset_name, time_str)
