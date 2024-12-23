@@ -1,0 +1,12 @@
+algorithm_params:
+  batch_size: 64
+  episodes: 100
+  epsilon: 0.1
+  epsilon_decay: 0.995
+  epsilon_min: 0.01
+  epsilon_steps: 20000
+  gamma: 0.2
+  learning_rate: 0.0001
+  reward_type: 1
+  target_update_freq: 100
+dataset: german

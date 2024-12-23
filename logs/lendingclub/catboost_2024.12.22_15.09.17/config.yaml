@@ -1,0 +1,6 @@
+catboost_params:
+  depth: 6
+  iterations: 300
+  learning_rate: 0.1
+  loss_function: Logloss
+dataset: lendingclub
