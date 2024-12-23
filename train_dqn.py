@@ -37,11 +37,11 @@ class QNetwork(nn.Module):
         self.fc_input_size = input_size - len(cat_dims) + self.embed_output_size
 
         self.layers = nn.Sequential(
-            nn.Linear(self.fc_input_size, 128),
+            nn.Linear(self.fc_input_size, 20),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Linear(20, 20),
             nn.ReLU(),
-            nn.Linear(64, output_size)
+            nn.Linear(20, output_size)
         )
     
     def forward(self, x, cat_features):
@@ -143,7 +143,7 @@ def update_c_matrix(action, true_label, majority_label, c_matrix):
     c_matrix[row, col] += 1    
     return c_matrix
 
-def train_and_evaluate(config, log_dir):
+def train_and_evaluate(config):
     # Load dataset
     dataset_name = config['dataset']
     dataset = get_dataset_from_name(dataset_name)
@@ -172,9 +172,10 @@ def train_and_evaluate(config, log_dir):
     epsilon = config['algorithm_params']['epsilon']
     epsilon_min = config['algorithm_params']['epsilon_min']
     epsilon_decay = config['algorithm_params']['epsilon_decay']
+    epsilon_step = (epsilon - epsilon_min) / config['algorithm_params']['epsilon_steps']
     batch_size = config['algorithm_params']['batch_size']
     target_update_freq = config['algorithm_params']['target_update_freq']
-    replay_buffer = ReplayBuffer(max_size=10000)
+    replay_buffer = ReplayBuffer(max_size=1000)
 
     # Initialize Q-Networks
     q_network = QNetwork(state_size, action_size, list(cat_dims.values()))
@@ -186,6 +187,7 @@ def train_and_evaluate(config, log_dir):
     criterion = nn.MSELoss()
 
     # Training loop
+    history = []
     episodes = config['algorithm_params']['episodes']
     for episode in range(episodes):
         total_reward = 0
@@ -242,42 +244,43 @@ def train_and_evaluate(config, log_dir):
                 loss.backward()
                 optimizer.step()
 
-        # Update target network
-        if episode % target_update_freq == 0:
-            target_network.load_state_dict(q_network.state_dict())
+            # Update target network
+            if (episode * len(X_train) + idx) % target_update_freq == 0:
+                target_network.load_state_dict(q_network.state_dict())
 
-        # Decay epsilon
-        if epsilon > epsilon_min:
-            epsilon *= epsilon_decay
+            # Decay epsilon
+            if epsilon > epsilon_min:
+                epsilon -= epsilon_step
+                #epsilon *= epsilon_decay
 
         print(f"Episode: {episode+1}, Total Reward: {total_reward}, Epsilon: {epsilon:.4f}")
 
-    # Evaluate the model
-    y_pred_proba = []
-    with torch.no_grad():
-        for idx in range(len(X_test)):
-            num_features = torch.FloatTensor(X_test.iloc[idx, ~X_test.columns.isin(categorical_columns)].values)
-            cat_features = torch.LongTensor(X_test.iloc[idx, X_test.columns.isin(categorical_columns)].values)
-            q_values = q_network(num_features, cat_features).squeeze(0)
-            proba = torch.softmax(q_values, dim=0)[1].item()
-            y_pred_proba.append(proba)
+        # Evaluate the model
+        y_pred_proba = []
+        with torch.no_grad():
+            for idx in range(len(X_test)):
+                num_features = torch.FloatTensor(X_test.iloc[idx, ~X_test.columns.isin(categorical_columns)].values)
+                cat_features = torch.LongTensor(X_test.iloc[idx, X_test.columns.isin(categorical_columns)].values)
+                q_values = q_network(num_features, cat_features).squeeze(0)
+                proba = torch.softmax(q_values, dim=0)[1].item()
+                y_pred_proba.append(proba)
 
-    y_pred = [1 if p > 0.5 else 0 for p in y_pred_proba]
-    metrics = {
-        'accuracy': accuracy_score(y_test, y_pred),
-        'f1_score': f1_score(y_test, y_pred),
-        'precision': precision_score(y_test, y_pred),
-        'recall': recall_score(y_test, y_pred),
-        'auc': roc_auc_score(y_test, y_pred_proba)
-    }
+        y_pred = [1 if p > 0.5 else 0 for p in y_pred_proba]
+        metrics = {
+            'accuracy': accuracy_score(y_test, y_pred),
+            'f1_score': f1_score(y_test, y_pred),
+            'precision': precision_score(y_test, y_pred),
+            'recall': recall_score(y_test, y_pred),
+            'auc': roc_auc_score(y_test, y_pred_proba)
+        }
+        history.append(metrics)
 
-    return q_network, metrics, y_test, y_pred_proba
+    return q_network, metrics, history, y_test, y_pred_proba
 
 def main(config_path):
     config = load_config(config_path)
-    log_dir = save_logs(config, {}, config['dataset'], [], [])
-    model, metrics, y_test, y_pred_proba = train_and_evaluate(config, log_dir)
-    save_logs(config, metrics, config['dataset'], y_test, y_pred_proba, log_dir)
+    model, metrics, history, y_test, y_pred_proba = train_and_evaluate(config)
+    save_logs(config, metrics, config['dataset'], y_test, y_pred_proba, history=history)
     print(f"Training complete. Logs saved in {os.path.join('logs', config['dataset'])}")
 
 if __name__ == "__main__":
