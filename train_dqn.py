@@ -61,6 +61,7 @@ class QNetwork(nn.Module):
             embedded = [emb(cat_features[:, i]) for i, emb in enumerate(self.embeddings)]
             embedded = torch.cat(embedded, dim=1)
             x = torch.cat([x, embedded], dim=1)
+        
         return self.layers(x)
 
 class ReplayBuffer:
@@ -153,11 +154,14 @@ def update_c_matrix(action, true_label, majority_label, c_matrix):
     return c_matrix
 
 def train_and_evaluate(config, log_dir):
+    # Determine the device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     # Load dataset
     dataset_name = config['dataset']
     dataset = get_dataset_from_name(dataset_name)
     categorical_columns = dataset.CATEGORICAL_COLUMNS
-    X_train, X_test, y_train, y_test = dataset.get_train_test_split()
+    X_train, X_test, y_train, y_test = dataset.get_train_test_split(data_sample=config.get('data_sample', None))
     X_train, cat_dims = preprocess_data(X_train, categorical_columns)
     X_test, _ = preprocess_data(X_test, categorical_columns)
 
@@ -186,8 +190,8 @@ def train_and_evaluate(config, log_dir):
     replay_buffer = ReplayBuffer(max_size=10000)
 
     # Initialize Q-Networks
-    q_network = QNetwork(state_size, action_size, list(cat_dims.values()))
-    target_network = QNetwork(state_size, action_size, list(cat_dims.values()))
+    q_network = QNetwork(state_size, action_size, list(cat_dims.values())).to(device)
+    target_network = QNetwork(state_size, action_size, list(cat_dims.values())).to(device)
     target_network.load_state_dict(q_network.state_dict())
     target_network.eval()
 
@@ -205,9 +209,9 @@ def train_and_evaluate(config, log_dir):
         # [FN, TN]
         c_matrix = np.zeros((2, 2))
         for idx in range(len(X_train)):
-            num_features = torch.FloatTensor(X_train.iloc[idx].values)
+            num_features = torch.FloatTensor(X_train.iloc[idx].values).to(device)
             if categorical_columns:
-                cat_features = torch.LongTensor(X_train.iloc[idx, X_train.columns.isin(categorical_columns)].values)
+                cat_features = torch.LongTensor(X_train.iloc[idx, X_train.columns.isin(categorical_columns)].values).to(device)
             else:
                 cat_features = None
             true_label = int(y_train.iloc[idx])
@@ -233,19 +237,19 @@ def train_and_evaluate(config, log_dir):
             if len(replay_buffer) > batch_size:
                 minibatch = replay_buffer.sample(batch_size)
                 states, actions, rewards, next_states, dones = zip(*minibatch)
-                num_states = torch.stack([s[0] for s in states])
-                num_next_states = torch.stack([s[0] for s in next_states])
+                num_states = torch.stack([s[0] for s in states]).to(device)
+                num_next_states = torch.stack([s[0] for s in next_states]).to(device)
                 
                 if categorical_columns:
-                    cat_states = torch.stack([s[1] for s in states])
-                    cat_next_states = torch.stack([s[1] for s in next_states])
+                    cat_states = torch.stack([s[1] for s in states]).to(device)
+                    cat_next_states = torch.stack([s[1] for s in next_states]).to(device)
                 else:
                     cat_states = None
                     cat_next_states = None
 
-                actions = torch.LongTensor(actions)
-                rewards = torch.FloatTensor(rewards)
-                dones = torch.BoolTensor(dones)
+                actions = torch.LongTensor(actions).to(device)
+                rewards = torch.FloatTensor(rewards).to(device)
+                dones = torch.BoolTensor(dones).to(device)
 
                 # Compute targets
                 q_values = q_network(num_states, cat_states).gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -274,9 +278,9 @@ def train_and_evaluate(config, log_dir):
     y_pred_proba = []
     with torch.no_grad():
         for idx in range(len(X_test)):
-            num_features = torch.FloatTensor(X_test.iloc[idx].values)
+            num_features = torch.FloatTensor(X_test.iloc[idx].values).to(device)
             if categorical_columns:
-                cat_features = torch.LongTensor(X_test.iloc[idx, X_test.columns.isin(categorical_columns)].values)
+                cat_features = torch.LongTensor(X_test.iloc[idx, X_test.columns.isin(categorical_columns)].values).to(device)
             else:
                 cat_features = None
             q_values = q_network(num_features, cat_features).squeeze(0)
