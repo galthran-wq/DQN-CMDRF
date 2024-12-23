@@ -19,7 +19,7 @@ class Dataset:
     def get_train_test_split(self, test_size=0.2, random_state=42, data_sample: Optional[int] = None):
         data: pd.DataFrame = self.load_data()
         if data_sample:
-            data = data.sample(n=data_sample, random_state=random_state)
+            _, data = train_test_split(data, train_size=data_sample, random_state=random_state, stratify=data[self.TARGET_COLUMN])
         X = data[self.CATEGORICAL_COLUMNS + self.NUMERICAL_COLUMNS]
         y = data[self.TARGET_COLUMN]
         return train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
