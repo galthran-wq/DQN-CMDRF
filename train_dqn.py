@@ -42,7 +42,8 @@ class QNetwork(nn.Module):
         else:
             self.embeddings = None
             self.embed_output_size = 0
-        self.fc_input_size = input_size - len(cat_dims) + self.embed_output_size
+        
+        self.fc_input_size = input_size + self.embed_output_size
 
         self.layers = nn.Sequential(
             nn.Linear(self.fc_input_size, 128),
