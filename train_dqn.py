@@ -1,10 +1,13 @@
 import os
 import yaml
 import json
+import pandas as pd
+import numpy as np
 from datetime import datetime
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 )
+from sklearn.preprocessing import LabelEncoder
 import sys
 import torch
 import torch.nn as nn
@@ -64,6 +67,82 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
+def reward_functions(reward_type, action, true_label, majority_label, c_matrix):
+    """
+    Returns the value of the reward function
+    reward_type (int) - number of the reward function in article 
+    possible values:
+    1 - static reward function (-1/1)
+    3, 5, 7 - dynamic reward functions
+    """
+    TP = c_matrix[0, 0]
+    FP = c_matrix[0, 1]
+    FN = c_matrix[1, 0]
+    TN = c_matrix[1, 1]
+    is_majority = true_label == majority_label
+    is_true = action == true_label
+    reward = 0
+
+    if reward_type == 1:
+        reward = 1 if action == true_label else -1
+    
+    elif reward_type == 3:
+        if is_true:
+            if is_majority:
+                if TN != 0:
+                    reward = (TN / (TN + FN) + TN / (TN + FP)) / 2
+            else:
+                reward = 1
+        else:
+            if is_majority:
+                if FP != 0:
+                    reward = - (FP / (FP + TP) + FP / (FP + TN)) / 2
+            else:
+                reward = -1
+    
+    elif reward_type == 5:
+        if is_true:
+            reward = 1
+        elif is_majority:
+            if FP != 0:
+                reward = - (FP / (FP + TP) + FP / (FP + TN)) / 2
+        else:
+            if FN != 0:
+                reward = - (FN / (FN + TN) + FN / (TP + FN)) / 2
+    
+    elif reward_type == 7:
+        if is_true:
+            if is_majority:
+                if TN != 0:
+                    reward = (TN / (TN + FN) + TN / (TN + FP)) / 2
+            else:
+                if TP != 0:
+                    reward = (TP / (TP + FP) + TP / (TP + FN) ) / 2
+        else:
+            if is_majority:
+                if FP != 0:
+                    reward = - (FP / (FP + TP) + FP / (FP + TN)) / 2
+            else:
+                if FN != 0:
+                    reward = - (FN / (FN + TN) + FN / (TP + FN)) / 2
+
+    else:
+        raise Exception(f'{reward_type} is not a valid reward type')
+    return reward
+
+def update_c_matrix(action, true_label, majority_label, c_matrix):
+    
+    row = 0
+    if true_label == majority_label:
+        row = 1
+    
+    col = row
+    if action != true_label:
+        col = int(not bool(row))
+
+    c_matrix[row, col] += 1    
+    return c_matrix
+
 def train_and_evaluate(config, log_dir):
     # Load dataset
     dataset_name = config['dataset']
@@ -73,12 +152,22 @@ def train_and_evaluate(config, log_dir):
     X_train, cat_dims = preprocess_data(X_train, categorical_columns)
     X_test, _ = preprocess_data(X_test, categorical_columns)
 
+    # Encoding target values to be 0 ad 1
+    y_encoder = LabelEncoder()
+    y_train = pd.DataFrame(y_encoder.fit_transform(y_train))
+    y_test = pd.DataFrame(y_encoder.transform(y_test))
+
+    # class of the majority of this dataset
+    majority_label = int(y_train.sum()[0] > len(y_train)/2)
+
     # Keep only numeric attributes
     X_train = X_train.select_dtypes(include=['number'])
     X_test = X_test.select_dtypes(include=['number'])
 
+
     state_size = X_train.shape[1]
     action_size = 2  # Binary classification (0 and 1)
+    reward_type = config['algorithm_params']['reward_type']
     gamma = config['algorithm_params']['gamma']
     epsilon = config['algorithm_params']['epsilon']
     epsilon_min = config['algorithm_params']['epsilon_min']
@@ -100,10 +189,16 @@ def train_and_evaluate(config, log_dir):
     episodes = config['algorithm_params']['episodes']
     for episode in range(episodes):
         total_reward = 0
+        # confusion matrix
+        # positive == minority
+        # negative == majority
+        # [TP, FP]
+        # [FN, TN]
+        c_matrix = np.zeros((2, 2))
         for idx in range(len(X_train)):
             num_features = torch.FloatTensor(X_train.iloc[idx, ~X_train.columns.isin(categorical_columns)].values)
             cat_features = torch.LongTensor(X_train.iloc[idx, X_train.columns.isin(categorical_columns)].values)
-            true_label = int(y_train.iloc[idx])
+            true_label = int(y_train.iloc[idx][0])
 
             # Epsilon-greedy action selection
             if random.random() < epsilon:
@@ -114,7 +209,8 @@ def train_and_evaluate(config, log_dir):
                     action = torch.argmax(q_values).item()
 
             # Calculate reward based on confusion matrix
-            reward = 1 if action == true_label else -1
+            c_matrix = update_c_matrix(action, true_label, majority_label, c_matrix)
+            reward = reward_functions(reward_type, action, true_label, majority_label, c_matrix) 
             next_state = num_features, cat_features  # Static environment
             done = idx == len(X_train) - 1
 
