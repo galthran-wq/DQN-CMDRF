@@ -8,7 +8,7 @@ algorithm_params:
   epsilon_steps: 20000
   gamma: 0.2
   learning_rate: 0.0001
-  reward_type: 1
+  reward_type: 7
   target_update_freq: 100
 
 

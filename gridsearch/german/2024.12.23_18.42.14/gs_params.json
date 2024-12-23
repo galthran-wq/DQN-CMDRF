@@ -1,0 +1,5 @@
+{
+    "cb__depth": 3,
+    "cb__learning_rate": 0.05,
+    "cb__n_estimators": 200
+}
