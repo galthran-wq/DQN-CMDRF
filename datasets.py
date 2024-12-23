@@ -30,7 +30,7 @@ class AustraliaDataset(Dataset):
     def load_data(self):
         file_path = os.path.join(self.data_path, "australian.dat")
         # Load the data using pandas
-        data = pd.read_csv(file_path, delim_whitespace=True, header=None)
+        data = pd.read_csv(file_path, sep=' ', header=None)
         # Define columns based on the dataset's structure
         data.columns = [f"A{i}" for i in range(1, 16)]
         return data
@@ -44,7 +44,7 @@ class GermanDataset(Dataset):
     def load_data(self):
         file_path = os.path.join(self.data_path, "german.data")
         # Load the data using pandas
-        data = pd.read_csv(file_path, delim_whitespace=True, header=None)
+        data = pd.read_csv(file_path, sep=' ', header=None)
         data.columns = [f"A{i}" for i in range(1, 22)]
         data[self.TARGET_COLUMN] = data[self.TARGET_COLUMN].map(lambda x: 0 if int(x) == 2 else 1)
         return data
