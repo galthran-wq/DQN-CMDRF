@@ -16,7 +16,7 @@ def train_and_evaluate(config, log_dir):
     # Load dataset
     dataset_name = config['dataset']
     dataset = get_dataset_from_name(dataset_name)
-    X_train, X_test, y_train, y_test = dataset.get_train_test_split()
+    X_train, X_test, y_train, y_test = dataset.get_train_test_split(data_sample=config.get('data_sample', None))
 
     # Prepare data for CatBoost
     train_pool = Pool(
